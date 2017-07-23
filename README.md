@@ -1,5 +1,6 @@
-[![Download on GoBuilder](http://badge.luzifer.io/v1/badge?title=Download%20on&text=GoBuilder)](https://gobuilder.me/github.com/Luzifer/elb-instance-status)
-[![License: Apache v2.0](https://badge.luzifer.io/v1/badge?color=5d79b5&title=license&text=Apache+v2.0)](http://www.apache.org/licenses/LICENSE-2.0)
+![](https://badges.fyi/github/license/Luzifer/elb-instance-status)
+![](https://badges.fyi/github/latest-release/Luzifer/elb-instance-status)
+![](https://badges.fyi/github/downloads/Luzifer/elb-instance-status)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Luzifer/elb-instance-status)](https://goreportcard.com/report/github.com/Luzifer/elb-instance-status)
 
 # Luzifer / elb-instance-status
