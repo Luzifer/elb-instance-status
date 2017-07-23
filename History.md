@@ -1,3 +1,9 @@
+# 0.5.2 / 2017-07-23
+
+  * Replace gobuilder as build tool
+  * Replace stub with full license text
+  * Update README badges
+
 # 0.5.1 / 2016-11-30
 
   * Fix: Give the process kill a bit more time to succeed
