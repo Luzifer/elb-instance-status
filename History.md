@@ -1,3 +1,8 @@
+# 0.6.0 / 2018-04-27
+
+  * Update deps, switch to dep for vendoring
+  * Deprecate parameter 'warn-only', update yaml unmarshal
+
 # 0.5.2 / 2017-07-23
 
   * Replace gobuilder as build tool
