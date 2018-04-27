@@ -58,4 +58,4 @@ They consist of an unique ID and three keys for each check:
 - `name` (required), A descriptive name of the check (do *not* use the same name twice!)
 - `command` (required), The check itself. Needs to have exit code 0 if everything is fine and any other if somthing is wrong.  
   The checks are executed using `/bin/bash -c "<command>"`.
-- `warn-only` (optional, default: false), Only put a WARN-line into the output but do not set HTTP status to 500
+- `warn_only` (optional, default: false), Only put a WARN-line into the output but do not set HTTP status to 500
