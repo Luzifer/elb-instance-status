@@ -1,3 +1,9 @@
+# 0.6.1 / 2018-04-27
+
+  * Update build image
+  * Update docs
+  * Fix license file
+
 # 0.6.0 / 2018-04-27
 
   * Update deps, switch to dep for vendoring
