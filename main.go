@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -46,9 +45,10 @@ var (
 )
 
 type checkCommand struct {
-	Name     string `yaml:"name"`
-	Command  string `yaml:"command"`
-	WarnOnly bool   `yaml:"warn-only"`
+	Name        string `yaml:"name"`
+	Command     string `yaml:"command"`
+	WarnOnly    bool   `yaml:"warn_only"`
+	WarnOnlyOld *bool  `yaml:"warn-only"`
 }
 
 type checkResult struct {
@@ -67,14 +67,16 @@ func init() {
 }
 
 func loadChecks() error {
-	var rawChecks []byte
+	var rawChecks io.Reader
 
 	if _, err := os.Stat(cfg.CheckDefinitionsFile); err == nil {
 		// We got a local file, read it
-		rawChecks, err = ioutil.ReadFile(cfg.CheckDefinitionsFile)
+		f, err := os.Open(cfg.CheckDefinitionsFile)
 		if err != nil {
 			return err
 		}
+		defer f.Close()
+		rawChecks = f
 	} else {
 		// Check whether we got an URL
 		if _, err := url.Parse(cfg.CheckDefinitionsFile); err != nil {
@@ -87,20 +89,23 @@ func loadChecks() error {
 			return err
 		}
 		defer resp.Body.Close()
-		rawChecks, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+		rawChecks = resp.Body
 	}
 
 	tmpResult := map[string]checkCommand{}
-	err := yaml.Unmarshal(rawChecks, &tmpResult)
-
-	if err == nil {
-		checks = tmpResult
+	if err := yaml.NewDecoder(rawChecks).Decode(&tmpResult); err != nil {
+		return err
 	}
 
-	return err
+	for name, check := range tmpResult {
+		if check.WarnOnlyOld != nil {
+			log.Printf("Parameter 'warn-only' in check %q is deprecated: It's now named 'warn_only'", name)
+			check.WarnOnly = *check.WarnOnlyOld
+		}
+	}
+
+	checks = tmpResult
+	return nil
 }
 
 func main() {
