@@ -1,6 +1,6 @@
 ---
 
-image: "quay.io/luzifer/repo-runner-image"
+image: "reporunner/golang-alpine:latest"
 checkout_dir: /go/src/github.com/Luzifer/elb-instance-status
 
 commands:
