@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Luzifer/rconfig"
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
+
+	"github.com/Luzifer/rconfig/v2"
 )
 
 var (
@@ -126,8 +126,9 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/status", handleELBHealthCheck)
-	r.Handle("/metrics", prometheus.Handler())
-	http.ListenAndServe(cfg.Listen, r)
+	if err := http.ListenAndServe(cfg.Listen, r); err != nil {
+		log.Fatalf("Unable to listen: %s", err)
+	}
 }
 
 func spawnChecks() {
@@ -140,7 +141,6 @@ func spawnChecks() {
 
 func executeAndRegisterCheck(ctx context.Context, checkID string) {
 	check := checks[checkID]
-	start := time.Now()
 
 	cmd := exec.Command("/bin/bash", "-e", "-o", "pipefail", "-c", check.Command)
 	cmd.Stderr = newPrefixedLogger(os.Stderr, checkID+":STDERR")
@@ -188,13 +188,6 @@ func executeAndRegisterCheck(ctx context.Context, checkID string) {
 
 	lastResultRegistered = time.Now()
 
-	if success {
-		checkPassing.WithLabelValues(checkID).Set(1)
-	} else {
-		checkPassing.WithLabelValues(checkID).Set(0)
-	}
-	checkExecutionTime.WithLabelValues(checkID).Observe(float64(time.Since(start).Nanoseconds()) / float64(time.Microsecond))
-
 	checkResultsLock.Unlock()
 }
 
@@ -224,10 +217,8 @@ func handleELBHealthCheck(res http.ResponseWriter, r *http.Request) {
 	res.Header().Set("X-Collection-Parsed-In", strconv.FormatInt(time.Since(start).Nanoseconds()/int64(time.Microsecond), 10)+"ms")
 	res.Header().Set("X-Last-Result-Registered-At", lastResultRegistered.Format(time.RFC1123))
 	if healthy {
-		currentStatusCode.Set(http.StatusOK)
 		res.WriteHeader(http.StatusOK)
 	} else {
-		currentStatusCode.Set(http.StatusInternalServerError)
 		res.WriteHeader(http.StatusInternalServerError)
 	}
 
