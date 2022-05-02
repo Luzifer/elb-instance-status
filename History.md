@@ -1,3 +1,9 @@
+# 1.0.0 / 2022-05-02
+
+  * Breaking: Remove prometheus support
+  * Add go1.18 dependency management
+  * Remove old dep management / vendoring
+
 # 0.6.1 / 2018-04-27
 
   * Update build image
