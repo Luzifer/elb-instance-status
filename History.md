@@ -1,3 +1,9 @@
+# 1.1.0 / 2024-03-31
+
+  * Modernize code, fix linter errors
+  * Replace build system
+  * Update dependencies
+
 # 1.0.0 / 2022-05-02
 
   * Breaking: Remove prometheus support
