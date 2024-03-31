@@ -2,22 +2,16 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"os/exec"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/robfig/cron/v3"
-	"golang.org/x/net/context"
-	"gopkg.in/yaml.v2"
+	"github.com/sirupsen/logrus"
 
 	"github.com/Luzifer/rconfig/v2"
 )
@@ -30,7 +24,8 @@ var (
 		CheckInterval         time.Duration `flag:"check-interval" default:"1m" description:"How often to execute checks (do not set below 10s!)"`
 		ConfigRefreshInterval time.Duration `flag:"config-refresh" default:"10m" description:"How often to update checks from definitions file / url"`
 
-		Verbose bool `flag:"verbose,v" default:"false" description:"Attach stdout of the executed commands"`
+		Verbose  bool   `flag:"verbose,v" default:"false" description:"Attach stdout of the executed commands"`
+		LogLevel string `flag:"log-level" default:"info" description:"Log level (debug, info, warn, error, fatal)"`
 
 		Listen         string `flag:"listen" default:":3000" description:"IP/Port to listen on for ELB health checks"`
 		VersionAndExit bool   `flag:"version" default:"false" description:"Print version and exit"`
@@ -44,157 +39,73 @@ var (
 	lastResultRegistered time.Time
 )
 
-type checkCommand struct {
-	Name        string `yaml:"name"`
-	Command     string `yaml:"command"`
-	WarnOnly    bool   `yaml:"warn_only"`
-	WarnOnlyOld *bool  `yaml:"warn-only"`
-}
-
-type checkResult struct {
-	Check     checkCommand
-	IsSuccess bool
-	Streak    int64
-}
-
-func init() {
-	rconfig.Parse(&cfg)
-
-	if cfg.VersionAndExit {
-		fmt.Printf("elb-instance-status %s\n", version)
-		os.Exit(0)
-	}
-}
-
-func loadChecks() error {
-	var rawChecks io.Reader
-
-	if _, err := os.Stat(cfg.CheckDefinitionsFile); err == nil {
-		// We got a local file, read it
-		f, err := os.Open(cfg.CheckDefinitionsFile)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		rawChecks = f
-	} else {
-		// Check whether we got an URL
-		if _, err := url.Parse(cfg.CheckDefinitionsFile); err != nil {
-			return errors.New("Definitions file is neither a local file nor a URL")
-		}
-
-		// We got an URL, fetch and read it
-		resp, err := http.Get(cfg.CheckDefinitionsFile)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		rawChecks = resp.Body
+func initApp() (err error) {
+	rconfig.AutoEnv(true)
+	if err = rconfig.Parse(&cfg); err != nil {
+		return fmt.Errorf("parsing CLI options: %w", err)
 	}
 
-	tmpResult := map[string]checkCommand{}
-	if err := yaml.NewDecoder(rawChecks).Decode(&tmpResult); err != nil {
-		return err
+	l, err := logrus.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		return fmt.Errorf("parsing log-level: %w", err)
 	}
+	logrus.SetLevel(l)
 
-	for name, check := range tmpResult {
-		if check.WarnOnlyOld != nil {
-			log.Printf("Parameter 'warn-only' in check %q is deprecated: It's now named 'warn_only'", name)
-			check.WarnOnly = *check.WarnOnlyOld
-		}
-	}
-
-	checks = tmpResult
 	return nil
 }
 
 func main() {
-	if err := loadChecks(); err != nil {
-		log.Fatalf("Unable to read definitions file: %s", err)
+	var err error
+	if err = initApp(); err != nil {
+		logrus.WithError(err).Fatal("initializing app")
+	}
+
+	if cfg.VersionAndExit {
+		fmt.Printf("elb-instance-status %s\n", version) //nolint:forbidigo
+		os.Exit(0)
+	}
+
+	if err = loadChecks(); err != nil {
+		logrus.WithError(err).Fatal("reading definitions file")
 	}
 
 	c := cron.New()
-	c.AddFunc("@every "+cfg.CheckInterval.String(), spawnChecks)
-	c.AddFunc("@every "+cfg.ConfigRefreshInterval.String(), func() {
+
+	if _, err = c.AddFunc(fmt.Sprintf("@every %s", cfg.CheckInterval), spawnChecks); err != nil {
+		logrus.WithError(err).Fatal("registering spawn function")
+	}
+
+	if _, err = c.AddFunc(fmt.Sprintf("@every %s", cfg.ConfigRefreshInterval), func() {
 		if err := loadChecks(); err != nil {
-			log.Printf("Unable to refresh checks: %s", err)
+			logrus.WithError(err).Error("refreshing checks")
 		}
-	})
+	}); err != nil {
+		logrus.WithError(err).Fatal("registering config-refresh function")
+	}
+
 	c.Start()
 
 	spawnChecks()
 
-	r := mux.NewRouter()
-	r.HandleFunc("/status", handleELBHealthCheck)
-	if err := http.ListenAndServe(cfg.Listen, r); err != nil {
-		log.Fatalf("Unable to listen: %s", err)
+	http.HandleFunc("/status", handleELBHealthCheck)
+
+	server := &http.Server{
+		Addr:              cfg.Listen,
+		Handler:           http.DefaultServeMux,
+		ReadHeaderTimeout: time.Second,
+	}
+
+	if err = server.ListenAndServe(); err != nil {
+		logrus.WithError(err).Fatal("listening for HTTP traffic")
 	}
 }
 
-func spawnChecks() {
-	ctx, _ := context.WithTimeout(context.Background(), cfg.CheckInterval-time.Second)
-
-	for id := range checks {
-		go executeAndRegisterCheck(ctx, id)
-	}
-}
-
-func executeAndRegisterCheck(ctx context.Context, checkID string) {
-	check := checks[checkID]
-
-	cmd := exec.Command("/bin/bash", "-e", "-o", "pipefail", "-c", check.Command)
-	cmd.Stderr = newPrefixedLogger(os.Stderr, checkID+":STDERR")
-	if cfg.Verbose {
-		cmd.Stdout = newPrefixedLogger(os.Stderr, checkID+":STDOUT")
-	}
-	err := cmd.Start()
-
-	if err == nil {
-		cmdDone := make(chan error)
-		go func(cmdDone chan error, cmd *exec.Cmd) { cmdDone <- cmd.Wait() }(cmdDone, cmd)
-		loop := true
-		for loop {
-			select {
-			case err = <-cmdDone:
-				loop = false
-			case <-ctx.Done():
-				log.Printf("Execution of check '%s' was killed through context timeout.", checkID)
-				cmd.Process.Kill()
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}
-
-	success := err == nil
-
-	checkResultsLock.Lock()
-
-	if _, ok := checkResults[checkID]; !ok {
-		checkResults[checkID] = &checkResult{
-			Check: check,
-		}
-	}
-
-	if success == checkResults[checkID].IsSuccess {
-		checkResults[checkID].Streak++
-	} else {
-		checkResults[checkID].IsSuccess = success
-		checkResults[checkID].Streak = 1
-	}
-
-	if !success {
-		log.Printf("Check %q failed, streak now at %d, error was: %s", checkID, checkResults[checkID].Streak, err)
-	}
-
-	lastResultRegistered = time.Now()
-
-	checkResultsLock.Unlock()
-}
-
-func handleELBHealthCheck(res http.ResponseWriter, r *http.Request) {
-	healthy := true
-	start := time.Now()
-	buf := bytes.NewBuffer([]byte{})
+func handleELBHealthCheck(w http.ResponseWriter, _ *http.Request) {
+	var (
+		healthy = true
+		start   = time.Now()
+		buf     = new(bytes.Buffer)
+	)
 
 	checkResultsLock.RLock()
 	for _, cr := range checkResults {
@@ -214,13 +125,15 @@ func handleELBHealthCheck(res http.ResponseWriter, r *http.Request) {
 	}
 	checkResultsLock.RUnlock()
 
-	res.Header().Set("X-Collection-Parsed-In", strconv.FormatInt(time.Since(start).Nanoseconds()/int64(time.Microsecond), 10)+"ms")
-	res.Header().Set("X-Last-Result-Registered-At", lastResultRegistered.Format(time.RFC1123))
+	w.Header().Set("X-Collection-Parsed-In", strconv.FormatInt(time.Since(start).Nanoseconds()/int64(time.Microsecond), 10)+"ms")
+	w.Header().Set("X-Last-Result-Registered-At", lastResultRegistered.Format(time.RFC1123))
 	if healthy {
-		res.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusOK)
 	} else {
-		res.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	io.Copy(res, buf)
+	if _, err := io.Copy(w, buf); err != nil {
+		logrus.WithError(err).Error("writing HTTP response body")
+	}
 }
