@@ -1,3 +1,7 @@
+# 1.1.1 / 2024-04-19
+
+  * Update dependencies
+
 # 1.1.0 / 2024-03-31
 
   * Modernize code, fix linter errors
