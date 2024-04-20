@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -143,9 +144,22 @@ func loadChecks() error {
 }
 
 func spawnChecks() {
-	ctx, _ := context.WithTimeout(context.Background(), cfg.CheckInterval-time.Second)
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.CheckInterval-time.Second)
+
+	wg.Add(len(checks))
+	go func() {
+		// Do not block the execution function but cleanup the context after
+		// all checks are done (or cancelled)
+		wg.Wait()
+		cancel()
+	}()
 
 	for id := range checks {
-		go executeAndRegisterCheck(ctx, id)
+		go func(ctx context.Context, id string) {
+			defer wg.Done()
+			executeAndRegisterCheck(ctx, id)
+		}(ctx, id)
 	}
 }
