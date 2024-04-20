@@ -1,3 +1,7 @@
+# 1.1.2 / 2024-04-20
+
+  * Fix: Cleanup context after checks have run
+
 # 1.1.1 / 2024-04-19
 
   * Update dependencies
