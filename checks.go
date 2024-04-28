@@ -39,12 +39,22 @@ func executeAndRegisterCheck(ctx context.Context, checkID string) {
 	var (
 		check  = checks[checkID]
 		logger = logrus.WithField("check_id", checkID)
+		stderr = logger.WithField("stream", "STDERR").Writer()
+		stdout = logger.WithField("stream", "STDOUT").Writer()
 	)
 
+	defer func() {
+		for _, c := range []io.Closer{stderr, stdout} {
+			if err := c.Close(); err != nil {
+				logrus.WithError(err).Error("closing check log-writer (leaked mem)")
+			}
+		}
+	}()
+
 	cmd := exec.Command("/bin/bash", "-e", "-o", "pipefail", "-c", check.Command) //#nosec G204 // Intended to run an user-defined command
-	cmd.Stderr = logger.WithField("stream", "STDERR").Writer()
+	cmd.Stderr = stderr
 	if cfg.Verbose {
-		cmd.Stdout = logger.WithField("stream", "STDOUT").Writer()
+		cmd.Stdout = stdout
 	}
 	err := cmd.Start()
 
