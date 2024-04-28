@@ -1,3 +1,7 @@
+# 1.1.3 / 2024-04-28
+
+  * Fix memory leak as of unclosed loggers
+
 # 1.1.2 / 2024-04-20
 
   * Fix: Cleanup context after checks have run
