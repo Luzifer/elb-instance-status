@@ -7,7 +7,6 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.4
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/net v0.53.0
 )
 
 require (
