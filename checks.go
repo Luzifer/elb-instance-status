@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	checkKillWait            = 100 * time.Millisecond
 	remoteConfigFetchTimeout = 2 * time.Second
 )
 
@@ -51,29 +50,14 @@ func executeAndRegisterCheck(ctx context.Context, checkID string) {
 		}
 	}()
 
-	cmd := exec.Command("/bin/bash", "-e", "-o", "pipefail", "-c", check.Command) //#nosec G204 // Intended to run an user-defined command
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-e", "-o", "pipefail", "-c", check.Command) //#nosec G204 // Intended to run an user-defined command
 	cmd.Stderr = stderr
 	if cfg.Verbose {
 		cmd.Stdout = stdout
 	}
-	err := cmd.Start()
-
-	if err == nil {
-		cmdDone := make(chan error)
-		go func(cmdDone chan error, cmd *exec.Cmd) { cmdDone <- cmd.Wait() }(cmdDone, cmd)
-		loop := true
-		for loop {
-			select {
-			case err = <-cmdDone:
-				loop = false
-			case <-ctx.Done():
-				logger.Error("execution of check will be killed through context timeout")
-				if err := cmd.Process.Kill(); err != nil {
-					logger.WithError(err).Error("killing check command")
-				}
-				time.Sleep(checkKillWait)
-			}
-		}
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		logger.WithError(ctx.Err()).Error("execution of check was killed through context timeout")
 	}
 
 	success := err == nil
