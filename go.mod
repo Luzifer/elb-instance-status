@@ -1,17 +1,17 @@
 module github.com/Luzifer/elb-instance-status
 
-go 1.22.1
+go 1.25.0
 
 require (
-	github.com/Luzifer/rconfig/v2 v2.5.0
+	github.com/Luzifer/rconfig/v2 v2.6.1
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/net v0.24.0
-	gopkg.in/yaml.v3 v3.0.1
+	github.com/sirupsen/logrus v1.9.4
+	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/net v0.53.0
 )
 
 require (
-	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
 )
