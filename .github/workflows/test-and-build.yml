@@ -39,7 +39,7 @@ jobs:
         run: 'awk "/^#/ && ++c==2{exit}; /^#/f" "History.md" | tail -n +2 >release_changelog.md'
 
       - name: Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.21.0
         if: startsWith(github.ref, 'refs/tags/')
         with:
           artifacts: '.build/*'
