@@ -1,3 +1,9 @@
+# 1.1.4 / 2026-04-30
+
+  * chore: improve / update readme
+  * chore: add containerized version
+  * chore: renew deps
+
 # 1.1.3 / 2024-04-28
 
   * Fix memory leak as of unclosed loggers
