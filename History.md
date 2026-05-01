@@ -1,3 +1,7 @@
+# 1.1.5 / 2026-05-01
+
+  * fix: provide basic tools for the health checks inside the container
+
 # 1.1.4 / 2026-04-30
 
   * chore: improve / update readme
