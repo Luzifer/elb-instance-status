@@ -17,12 +17,20 @@ RUN set -ex \
       -trimpath
 
 
-FROM ghcr.io/luzifer-docker/ca-certificates:3.123.1@sha256:a8454f268ffa462515b12943a39f5e5a4fcdc2c5793b968adba88c8294d7931c
+FROM alpine:3.23
 
 LABEL org.opencontainers.image.authors="Knut Ahlers <knut@ahlers.me>" \
       org.opencontainers.image.url="https://github.com/Luzifer/elb-instance-status/pkgs/container/elb-instance-status" \
       org.opencontainers.image.source="https://github.com/Luzifer/elb-instance-status" \
       org.opencontainers.image.title="elb-instance-status"
+
+RUN set -ex \
+ && apk --no-cache add \
+      bash \
+      ca-certificates \
+      curl \
+      jq \
+      yq-go
 
 COPY --from=builder /go/bin/elb-instance-status /usr/bin/elb-instance-status
 
