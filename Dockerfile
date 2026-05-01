@@ -17,7 +17,7 @@ RUN set -ex \
       -trimpath
 
 
-FROM alpine:3.23
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
 LABEL org.opencontainers.image.authors="Knut Ahlers <knut@ahlers.me>" \
       org.opencontainers.image.url="https://github.com/Luzifer/elb-instance-status/pkgs/container/elb-instance-status" \
